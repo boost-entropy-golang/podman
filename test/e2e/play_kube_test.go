@@ -8,6 +8,7 @@ import (
 	"net"
 	"net/url"
 	"os"
+	"os/user"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -327,6 +328,11 @@ spec:
     name: {{ .Name }}
   {{ end }}
 {{ end }}
+{{ if .SecurityContext }}
+  securityContext:
+    {{ if .RunAsUser }}runAsUser: {{ .RunAsUser }}{{- end }}
+    {{ if .RunAsGroup }}runAsGroup: {{ .RunAsGroup }}{{- end }}
+{{ end }}
   containers:
 {{ with .Ctrs }}
   {{ range . }}
@@ -393,6 +399,8 @@ spec:
     {{- end }}
     {{ if .SecurityContext }}
     securityContext:
+      {{ if .RunAsUser }}runAsUser: {{ .RunAsUser }}{{- end }}
+      {{ if .RunAsGroup }}runAsGroup: {{ .RunAsGroup }}{{- end }}
       allowPrivilegeEscalation: true
       {{ if .Caps }}
       capabilities:
@@ -758,16 +766,19 @@ func withPVCAnnotations(k, v string) pvcOption {
 
 // Pod describes the options a kube yaml can be configured at pod level
 type Pod struct {
-	Name          string
-	RestartPolicy string
-	Hostname      string
-	HostNetwork   bool
-	HostAliases   []HostAlias
-	Ctrs          []*Ctr
-	InitCtrs      []*Ctr
-	Volumes       []*Volume
-	Labels        map[string]string
-	Annotations   map[string]string
+	Name            string
+	RestartPolicy   string
+	Hostname        string
+	HostNetwork     bool
+	HostAliases     []HostAlias
+	Ctrs            []*Ctr
+	InitCtrs        []*Ctr
+	Volumes         []*Volume
+	Labels          map[string]string
+	Annotations     map[string]string
+	SecurityContext bool
+	RunAsUser       string
+	RunAsGroup      string
 }
 
 type HostAlias struct {
@@ -801,6 +812,24 @@ func getPod(options ...podOption) *Pod {
 }
 
 type podOption func(*Pod)
+
+func withPodSecurityContext(sc bool) podOption {
+	return func(p *Pod) {
+		p.SecurityContext = sc
+	}
+}
+
+func withPodRunAsUser(runAsUser string) podOption {
+	return func(p *Pod) {
+		p.RunAsUser = runAsUser
+	}
+}
+
+func withPodRunAsGroup(runAsGroup string) podOption {
+	return func(p *Pod) {
+		p.RunAsGroup = runAsGroup
+	}
+}
 
 func withPodName(name string) podOption {
 	return func(pod *Pod) {
@@ -949,6 +978,8 @@ type Ctr struct {
 	Env             []Env
 	EnvFrom         []EnvFrom
 	InitCtrType     string
+	RunAsUser       string
+	RunAsGroup      string
 }
 
 // getCtr takes a list of ctrOptions and returns a Ctr with sane defaults
@@ -1042,6 +1073,18 @@ func withSecurityContext(sc bool) ctrOption {
 	}
 }
 
+func withRunAsUser(runAsUser string) ctrOption {
+	return func(c *Ctr) {
+		c.RunAsUser = runAsUser
+	}
+}
+
+func withRunAsGroup(runAsGroup string) ctrOption {
+	return func(c *Ctr) {
+		c.RunAsGroup = runAsGroup
+	}
+}
+
 func withCapAdd(caps []string) ctrOption {
 	return func(c *Ctr) {
 		c.CapAdd = caps
@@ -1105,8 +1148,12 @@ func withEnvFrom(name, from string, optional bool) ctrOption {
 	}
 }
 
+func makeCtrNameInPod(pod *Pod, containerName string) string {
+	return fmt.Sprintf("%s-%s", pod.Name, containerName)
+}
+
 func getCtrNameInPod(pod *Pod) string {
-	return fmt.Sprintf("%s-%s", pod.Name, defaultCtrName)
+	return makeCtrNameInPod(pod, defaultCtrName)
 }
 
 type HostPath struct {
@@ -3222,6 +3269,38 @@ invalid kube kind
 		Expect(ls.OutputToStringArray()).To(HaveLen(1))
 	})
 
+	It("podman play kube RunAsUser", func() {
+		ctr1Name := "ctr1"
+		ctr2Name := "ctr2"
+		ctr1 := getCtr(withName(ctr1Name), withSecurityContext(true), withRunAsUser("101"), withRunAsGroup("102"))
+		ctr2 := getCtr(withName(ctr2Name), withSecurityContext(true))
+
+		pod := getPod(
+			withCtr(ctr1),
+			withCtr(ctr2),
+			withPodSecurityContext(true),
+			withPodRunAsUser("103"),
+			withPodRunAsGroup("104"),
+		)
+
+		err := generateKubeYaml("pod", pod, kubeYaml)
+		Expect(err).To(BeNil())
+
+		cmd := podmanTest.Podman([]string{"play", "kube", kubeYaml})
+		cmd.WaitWithDefaultTimeout()
+		Expect(cmd).Should(Exit(0))
+
+		// we expect the user:group as configured for the container
+		inspect := podmanTest.Podman([]string{"container", "inspect", "--format", "'{{.Config.User}}'", makeCtrNameInPod(pod, ctr1Name)})
+		inspect.WaitWithDefaultTimeout()
+		Expect(inspect.OutputToString()).To(Equal("'101:102'"))
+
+		// we expect the user:group as configured for the pod
+		inspect = podmanTest.Podman([]string{"container", "inspect", "--format", "'{{.Config.User}}'", makeCtrNameInPod(pod, ctr2Name)})
+		inspect.WaitWithDefaultTimeout()
+		Expect(inspect.OutputToString()).To(Equal("'103:104'"))
+	})
+
 	Describe("verify environment variables", func() {
 		var maxLength int
 		BeforeEach(func() {
@@ -3555,6 +3634,55 @@ ENV OPENJ9_JAVA_OPTIONS=%q
 		inspect.WaitWithDefaultTimeout()
 		Expect(start).Should(Exit(0))
 		Expect((inspect.InspectContainerToJSON()[0]).HostConfig.LogConfig.Tag).To(Equal("{{.ImageName}}"))
+	})
 
+	// Check that --userns=auto creates a user namespace
+	It("podman play kube --userns=auto", func() {
+		u, err := user.Current()
+		Expect(err).To(BeNil())
+		name := u.Name
+		if name == "root" {
+			name = "containers"
+		}
+		content, err := ioutil.ReadFile("/etc/subuid")
+		if err != nil {
+			Skip("cannot read /etc/subuid")
+		}
+		if !strings.Contains(string(content), name) {
+			Skip("cannot find mappings for the current user")
+		}
+
+		initialUsernsConfig, err := ioutil.ReadFile("/proc/self/uid_map")
+		Expect(err).To(BeNil())
+		if os.Geteuid() != 0 {
+			unshare := podmanTest.Podman([]string{"unshare", "cat", "/proc/self/uid_map"})
+			unshare.WaitWithDefaultTimeout()
+			Expect(unshare).Should(Exit(0))
+			initialUsernsConfig = unshare.Out.Contents()
+		}
+
+		pod := getPod()
+		err = generateKubeYaml("pod", pod, kubeYaml)
+		Expect(err).To(BeNil())
+
+		kube := podmanTest.Podman([]string{"play", "kube", kubeYaml})
+		kube.WaitWithDefaultTimeout()
+		Expect(kube).Should(Exit(0))
+
+		usernsInCtr := podmanTest.Podman([]string{"exec", getCtrNameInPod(pod), "cat", "/proc/self/uid_map"})
+		usernsInCtr.WaitWithDefaultTimeout()
+		Expect(usernsInCtr).Should(Exit(0))
+		// the conversion to string is needed for better error messages
+		Expect(string(usernsInCtr.Out.Contents())).To(Equal(string(initialUsernsConfig)))
+
+		// PodmanNoCache is a workaround for https://github.com/containers/storage/issues/1232
+		kube = podmanTest.PodmanNoCache([]string{"play", "kube", "--replace", "--userns=auto", kubeYaml})
+		kube.WaitWithDefaultTimeout()
+		Expect(kube).Should(Exit(0))
+
+		usernsInCtr = podmanTest.Podman([]string{"exec", getCtrNameInPod(pod), "cat", "/proc/self/uid_map"})
+		usernsInCtr.WaitWithDefaultTimeout()
+		Expect(usernsInCtr).Should(Exit(0))
+		Expect(string(usernsInCtr.Out.Contents())).To(Not(Equal(string(initialUsernsConfig))))
 	})
 })

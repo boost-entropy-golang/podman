@@ -222,6 +222,16 @@ func (ic *ContainerEngine) playKubePod(ctx context.Context, podName string, podY
 		podOpt.Net.NetworkOptions = netOpts
 	}
 
+	if options.Userns == "" {
+		options.Userns = "host"
+	}
+
+	// Validate the userns modes supported.
+	podOpt.Userns, err = specgen.ParseUserNamespace(options.Userns)
+	if err != nil {
+		return nil, err
+	}
+
 	// FIXME This is very hard to support properly with a good ux
 	if len(options.StaticIPs) > *ipIndex {
 		if !podOpt.Net.Network.IsBridge() {
@@ -352,6 +362,7 @@ func (ic *ContainerEngine) playKubePod(ctx context.Context, podName string, podY
 		infraImage := util.DefaultContainerConfig().Engine.InfraImage
 		infraOptions := entities.NewInfraContainerCreateOptions()
 		infraOptions.Hostname = podSpec.PodSpecGen.PodBasicConfig.Hostname
+		infraOptions.UserNS = options.Userns
 		podSpec.PodSpecGen.InfraImage = infraImage
 		podSpec.PodSpecGen.NoInfra = false
 		podSpec.PodSpecGen.InfraContainerSpec = specgen.NewSpecGenerator(infraImage, false)
@@ -412,22 +423,24 @@ func (ic *ContainerEngine) playKubePod(ctx context.Context, podName string, podY
 		}
 
 		specgenOpts := kube.CtrSpecGenOptions{
-			Annotations:       annotations,
-			Container:         initCtr,
-			Image:             pulledImage,
-			Volumes:           volumes,
-			PodID:             pod.ID(),
-			PodName:           podName,
-			PodInfraID:        podInfraID,
-			ConfigMaps:        configMaps,
-			SeccompPaths:      seccompPaths,
-			RestartPolicy:     ctrRestartPolicy,
-			NetNSIsHost:       p.NetNS.IsHost(),
-			SecretsManager:    secretsManager,
-			LogDriver:         options.LogDriver,
-			LogOptions:        options.LogOptions,
-			Labels:            labels,
-			InitContainerType: define.AlwaysInitContainer,
+			Annotations:        annotations,
+			ConfigMaps:         configMaps,
+			Container:          initCtr,
+			Image:              pulledImage,
+			InitContainerType:  define.AlwaysInitContainer,
+			Labels:             labels,
+			LogDriver:          options.LogDriver,
+			LogOptions:         options.LogOptions,
+			NetNSIsHost:        p.NetNS.IsHost(),
+			PodID:              pod.ID(),
+			PodInfraID:         podInfraID,
+			PodName:            podName,
+			PodSecurityContext: podYAML.Spec.SecurityContext,
+			RestartPolicy:      ctrRestartPolicy,
+			SeccompPaths:       seccompPaths,
+			SecretsManager:     secretsManager,
+			UserNSIsHost:       p.Userns.IsHost(),
+			Volumes:            volumes,
 		}
 		specGen, err := kube.ToSpecGen(ctx, &specgenOpts)
 		if err != nil {
@@ -460,21 +473,23 @@ func (ic *ContainerEngine) playKubePod(ctx context.Context, podName string, podY
 		}
 
 		specgenOpts := kube.CtrSpecGenOptions{
-			Annotations:    annotations,
-			Container:      container,
-			Image:          pulledImage,
-			Volumes:        volumes,
-			PodID:          pod.ID(),
-			PodName:        podName,
-			PodInfraID:     podInfraID,
-			ConfigMaps:     configMaps,
-			SeccompPaths:   seccompPaths,
-			RestartPolicy:  ctrRestartPolicy,
-			NetNSIsHost:    p.NetNS.IsHost(),
-			SecretsManager: secretsManager,
-			LogDriver:      options.LogDriver,
-			LogOptions:     options.LogOptions,
-			Labels:         labels,
+			Annotations:        annotations,
+			ConfigMaps:         configMaps,
+			Container:          container,
+			Image:              pulledImage,
+			Labels:             labels,
+			LogDriver:          options.LogDriver,
+			LogOptions:         options.LogOptions,
+			NetNSIsHost:        p.NetNS.IsHost(),
+			PodID:              pod.ID(),
+			PodInfraID:         podInfraID,
+			PodName:            podName,
+			PodSecurityContext: podYAML.Spec.SecurityContext,
+			RestartPolicy:      ctrRestartPolicy,
+			SeccompPaths:       seccompPaths,
+			SecretsManager:     secretsManager,
+			UserNSIsHost:       p.Userns.IsHost(),
+			Volumes:            volumes,
 		}
 		specGen, err := kube.ToSpecGen(ctx, &specgenOpts)
 		if err != nil {
