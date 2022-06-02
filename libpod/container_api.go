@@ -202,9 +202,8 @@ func (c *Container) Kill(signal uint) error {
 		}
 	}
 
-	// TODO: Is killing a paused container OK?
 	switch c.state.State {
-	case define.ContainerStateRunning, define.ContainerStateStopping:
+	case define.ContainerStateRunning, define.ContainerStateStopping, define.ContainerStatePaused:
 		// Note that killing containers in "stopping" state is okay.
 		// In that state, the Podman is waiting for the runtime to
 		// stop the container and if that is taking too long, a user
@@ -447,7 +446,7 @@ func (c *Container) AddArtifact(name string, data []byte) error {
 		return define.ErrCtrRemoved
 	}
 
-	return ioutil.WriteFile(c.getArtifactPath(name), data, 0740)
+	return ioutil.WriteFile(c.getArtifactPath(name), data, 0o740)
 }
 
 // GetArtifact reads the specified artifact file from the container
@@ -878,7 +877,7 @@ func (c *Container) ShouldRestart(ctx context.Context) bool {
 
 // CopyFromArchive copies the contents from the specified tarStream to path
 // *inside* the container.
-func (c *Container) CopyFromArchive(ctx context.Context, containerPath string, chown bool, rename map[string]string, tarStream io.Reader) (func() error, error) {
+func (c *Container) CopyFromArchive(_ context.Context, containerPath string, chown, noOverwriteDirNonDir bool, rename map[string]string, tarStream io.Reader) (func() error, error) {
 	if !c.batched {
 		c.lock.Lock()
 		defer c.lock.Unlock()
@@ -888,7 +887,7 @@ func (c *Container) CopyFromArchive(ctx context.Context, containerPath string, c
 		}
 	}
 
-	return c.copyFromArchive(containerPath, chown, rename, tarStream)
+	return c.copyFromArchive(containerPath, chown, noOverwriteDirNonDir, rename, tarStream)
 }
 
 // CopyToArchive copies the contents from the specified path *inside* the

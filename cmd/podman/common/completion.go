@@ -5,15 +5,20 @@ import (
 	"fmt"
 	"os"
 	"reflect"
+	"strconv"
 	"strings"
+	"unicode"
 
+	libimageDefine "github.com/containers/common/libimage/define"
 	"github.com/containers/common/libnetwork/types"
 	"github.com/containers/common/pkg/config"
 	"github.com/containers/image/v5/pkg/sysregistriesv2"
 	"github.com/containers/podman/v4/cmd/podman/registry"
 	"github.com/containers/podman/v4/libpod/define"
+	"github.com/containers/podman/v4/libpod/events"
 	"github.com/containers/podman/v4/pkg/domain/entities"
 	"github.com/containers/podman/v4/pkg/rootless"
+	"github.com/containers/podman/v4/pkg/signal"
 	systemdDefine "github.com/containers/podman/v4/pkg/systemd/define"
 	"github.com/containers/podman/v4/pkg/util"
 	"github.com/spf13/cobra"
@@ -24,6 +29,8 @@ var (
 	ChangeCmds = []string{"CMD", "ENTRYPOINT", "ENV", "EXPOSE", "LABEL", "ONBUILD", "STOPSIGNAL", "USER", "VOLUME", "WORKDIR"}
 	// LogLevels supported by podman
 	LogLevels = []string{"trace", "debug", "info", "warn", "warning", "error", "fatal", "panic"}
+	// ValidSaveFormats is the list of support podman save formats
+	ValidSaveFormats = []string{define.OCIManifestDir, define.OCIArchive, define.V2s2ManifestDir, define.V2s2Archive}
 )
 
 type completeType int
@@ -492,6 +499,11 @@ func AutocompleteImages(cmd *cobra.Command, args []string, toComplete string) ([
 	return getImages(cmd, toComplete)
 }
 
+// AutocompleteImageSearchFilters - Autocomplate `search --filter`.
+func AutocompleteImageSearchFilters(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+	return libimageDefine.SearchFilters, cobra.ShellCompDirectiveNoFileComp
+}
+
 // AutocompletePodExitPolicy - Autocomplete pod exit policy.
 func AutocompletePodExitPolicy(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 	return config.PodExitPolicies, cobra.ShellCompDirectiveNoFileComp
@@ -591,7 +603,9 @@ func AutocompleteRunlabelCommand(cmd *cobra.Command, args []string, toComplete s
 		return nil, cobra.ShellCompDirectiveNoFileComp
 	}
 	if len(args) == 0 {
-		// FIXME: What labels can we recommend here?
+		// This is unfortunate because the argument order is label followed by image.
+		// If it would be the other way around we could inspect the first arg and get
+		// all labels from it to suggest them.
 		return nil, cobra.ShellCompDirectiveNoFileComp
 	}
 	if len(args) == 1 {
@@ -796,8 +810,7 @@ func AutocompleteLogDriver(cmd *cobra.Command, args []string, toComplete string)
 // AutocompleteLogOpt - Autocomplete log-opt options.
 // -> "path=", "tag="
 func AutocompleteLogOpt(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-	// FIXME: are these the only one? the man page states these but in the current shell completion they are more options
-	logOptions := []string{"path=", "tag="}
+	logOptions := []string{"path=", "tag=", "max-size="}
 	if strings.HasPrefix(toComplete, "path=") {
 		return nil, cobra.ShellCompDirectiveDefault
 	}
@@ -836,10 +849,26 @@ func AutocompleteSecurityOption(cmd *cobra.Command, args []string, toComplete st
 }
 
 // AutocompleteStopSignal - Autocomplete stop signal options.
-// -> "SIGHUP", "SIGINT", "SIGKILL", "SIGTERM"
+// Autocompletes signals both lower or uppercase depending on the user input.
 func AutocompleteStopSignal(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-	// FIXME: add more/different signals?
-	stopSignals := []string{"SIGHUP", "SIGINT", "SIGKILL", "SIGTERM"}
+	// convertCase will convert a string to lowercase only if the user input is lowercase
+	convertCase := func(s string) string { return s }
+	if len(toComplete) > 0 && unicode.IsLower(rune(toComplete[0])) {
+		convertCase = strings.ToLower
+	}
+
+	prefix := ""
+	// if input starts with "SI" we have to add SIG in front
+	// since the signal map does not have this prefix but the option
+	// allows signals with and without SIG prefix
+	if strings.HasPrefix(toComplete, convertCase("SI")) {
+		prefix = "SIG"
+	}
+
+	stopSignals := make([]string, 0, len(signal.SignalMap))
+	for sig := range signal.SignalMap {
+		stopSignals = append(stopSignals, convertCase(prefix+sig))
+	}
 	return stopSignals, cobra.ShellCompDirectiveNoFileComp
 }
 
@@ -960,9 +989,22 @@ func AutocompleteNetworkFlag(cmd *cobra.Command, args []string, toComplete strin
 	return append(networks, suggestions...), dir
 }
 
+type formatSuggestion struct {
+	fieldname string
+	suffix    string
+}
+
+func convertFormatSuggestions(suggestions []formatSuggestion) []string {
+	completions := make([]string, 0, len(suggestions))
+	for _, f := range suggestions {
+		completions = append(completions, f.fieldname+f.suffix)
+	}
+	return completions
+}
+
 // AutocompleteFormat - Autocomplete json or a given struct to use for a go template.
 // The input can be nil, In this case only json will be autocompleted.
-// This function will only work for structs other types are not supported.
+// This function will only work for pointer to structs other types are not supported.
 // When "{{." is typed the field and method names of the given struct will be completed.
 // This also works recursive for nested structs.
 func AutocompleteFormat(o interface{}) func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
@@ -991,6 +1033,12 @@ func AutocompleteFormat(o interface{}) func(cmd *cobra.Command, args []string, t
 		// split this into it struct field names
 		fields := strings.Split(field[len(field)-1], ".")
 		f := reflect.ValueOf(o)
+		if f.Kind() != reflect.Ptr {
+			// We panic here to make sure that all callers pass the value by reference.
+			// If someone passes a by value then all podman commands will panic since
+			// this function is run at init time.
+			panic("AutocompleteFormat: passed value must be a pointer to a struct")
+		}
 		for i := 1; i < len(fields); i++ {
 			// last field get all names to suggest
 			if i == len(fields)-1 {
@@ -999,61 +1047,83 @@ func AutocompleteFormat(o interface{}) func(cmd *cobra.Command, args []string, t
 				toCompArr := strings.Split(toComplete, ".")
 				toCompArr[len(toCompArr)-1] = ""
 				toComplete = strings.Join(toCompArr, ".")
-				return prefixSlice(toComplete, suggestions), cobra.ShellCompDirectiveNoSpace | cobra.ShellCompDirectiveNoFileComp
+				return prefixSlice(toComplete, convertFormatSuggestions(suggestions)), cobra.ShellCompDirectiveNoSpace | cobra.ShellCompDirectiveNoFileComp
 			}
 
-			val := getActualStructType(f)
-			if val == nil {
-				// no struct return nothing to complete
+			// first follow pointer and create element when it is nil
+			f = actualReflectValue(f)
+			switch f.Kind() {
+			case reflect.Struct:
+				for j := 0; j < f.NumField(); j++ {
+					field := f.Type().Field(j)
+					// ok this is a bit weird but when we have an embedded nil struct
+					// calling FieldByName on a name which is present on this struct will panic
+					// Therefore we have to init them (non nil ptr), https://github.com/containers/podman/issues/14223
+					if field.Anonymous && f.Field(j).Type().Kind() == reflect.Ptr {
+						f.Field(j).Set(reflect.New(f.Field(j).Type().Elem()))
+					}
+				}
+				// set the next struct field
+				f = f.FieldByName(fields[i])
+			case reflect.Map:
+				rtype := f.Type().Elem()
+				if rtype.Kind() == reflect.Ptr {
+					rtype = rtype.Elem()
+				}
+				f = reflect.New(rtype)
+			case reflect.Func:
+				if f.Type().NumOut() != 1 {
+					// unsupported type return nothing
+					return nil, cobra.ShellCompDirectiveNoFileComp
+				}
+				f = reflect.New(f.Type().Out(0))
+			default:
+				// unsupported type return nothing
 				return nil, cobra.ShellCompDirectiveNoFileComp
 			}
-			f = *val
-
-			// set the next struct field
-			f = f.FieldByName(fields[i])
 		}
 		return nil, cobra.ShellCompDirectiveNoFileComp
 	}
 }
 
-// getActualStructType take the value and check if it is a struct,
+// actualReflectValue takes the value,
 // if it is pointer it will dereference it and when it is nil,
-// it will create a new value from it to get the actual struct
-// returns nil when type is not a struct
-func getActualStructType(f reflect.Value) *reflect.Value {
+// it will create a new value from it
+func actualReflectValue(f reflect.Value) reflect.Value {
 	// follow the pointer first
 	if f.Kind() == reflect.Ptr {
 		// if the pointer is nil we create a new value from the elements type
-		// this allows us to follow nil pointers and get the actual struct fields
+		// this allows us to follow nil pointers and get the actual type
 		if f.IsNil() {
 			f = reflect.New(f.Type().Elem())
 		}
 		f = f.Elem()
 	}
-	// we only support structs
-	if f.Kind() != reflect.Struct {
-		return nil
-	}
-	return &f
+	return f
 }
 
 // getStructFields reads all struct field names and method names and returns them.
-func getStructFields(f reflect.Value, prefix string) []string {
-	var suggestions []string
+func getStructFields(f reflect.Value, prefix string) []formatSuggestion {
+	var suggestions []formatSuggestion
 	if f.IsValid() {
 		suggestions = append(suggestions, getMethodNames(f, prefix)...)
 	}
 
-	val := getActualStructType(f)
-	if val == nil {
-		// no struct return nothing to complete
+	f = actualReflectValue(f)
+	// we only support structs
+	if f.Kind() != reflect.Struct {
 		return suggestions
 	}
-	f = *val
 
+	var anonymous []formatSuggestion
 	// loop over all field names
 	for j := 0; j < f.NumField(); j++ {
 		field := f.Type().Field(j)
+		// check if struct field is not exported, templates only use exported fields
+		// PkgPath is always empty for exported fields
+		if field.PkgPath != "" {
+			continue
+		}
 		fname := field.Name
 		suffix := "}}"
 		kind := field.Type.Kind()
@@ -1062,27 +1132,63 @@ func getStructFields(f reflect.Value, prefix string) []string {
 			kind = field.Type.Elem().Kind()
 		}
 		// when we have a nested struct do not append braces instead append a dot
-		if kind == reflect.Struct {
+		if kind == reflect.Struct || kind == reflect.Map {
 			suffix = "."
 		}
 		// if field is anonymous add the child fields as well
 		if field.Anonymous {
-			suggestions = append(suggestions, getStructFields(f.Field(j), prefix)...)
-		} else if strings.HasPrefix(fname, prefix) {
-			// add field name with suffix
-			suggestions = append(suggestions, fname+suffix)
+			anonymous = append(anonymous, getStructFields(f.Field(j), prefix)...)
 		}
+		if strings.HasPrefix(fname, prefix) {
+			// add field name with suffix
+			suggestions = append(suggestions, formatSuggestion{fieldname: fname, suffix: suffix})
+		}
+	}
+outer:
+	for _, ano := range anonymous {
+		// we should only add anonymous child fields if they are not already present.
+		for _, sug := range suggestions {
+			if ano.fieldname == sug.fieldname {
+				continue outer
+			}
+		}
+		suggestions = append(suggestions, ano)
 	}
 	return suggestions
 }
 
-func getMethodNames(f reflect.Value, prefix string) []string {
-	suggestions := make([]string, 0, f.NumMethod())
+func getMethodNames(f reflect.Value, prefix string) []formatSuggestion {
+	suggestions := make([]formatSuggestion, 0, f.NumMethod())
 	for j := 0; j < f.NumMethod(); j++ {
-		fname := f.Type().Method(j).Name
+		method := f.Type().Method(j)
+		// in a template we can only run functions with one return value
+		if method.Func.Type().NumOut() != 1 {
+			continue
+		}
+		// when we have a nested struct do not append braces instead append a dot
+		kind := method.Func.Type().Out(0).Kind()
+		suffix := "}}"
+		if kind == reflect.Struct || kind == reflect.Map {
+			suffix = "."
+		}
+		// From a template users POV it is not important when the use a struct field or method.
+		// They only notice the difference when the function requires arguments.
+		// So lets be nice and let the user know that this method requires arguments via the help text.
+		// Note since this is actually a method on a type the first argument is always fix so we should skip it.
+		num := method.Func.Type().NumIn() - 1
+		if num > 0 {
+			// everything after tab will the completion scripts show as help when enabled
+			// overwrite the suffix because it expects the args
+			suffix = "\tThis is a function and requires " + strconv.Itoa(num) + " argument"
+			if num > 1 {
+				// add plural s
+				suffix += "s"
+			}
+		}
+		fname := method.Name
 		if strings.HasPrefix(fname, prefix) {
 			// add method name with closing braces
-			suggestions = append(suggestions, fname+"}}")
+			suggestions = append(suggestions, formatSuggestion{fieldname: fname, suffix: suffix})
 		}
 	}
 	return suggestions
@@ -1091,11 +1197,21 @@ func getMethodNames(f reflect.Value, prefix string) []string {
 // AutocompleteEventFilter - Autocomplete event filter flag options.
 // -> "container=", "event=", "image=", "pod=", "volume=", "type="
 func AutocompleteEventFilter(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+	event := func(_ string) ([]string, cobra.ShellCompDirective) {
+		return []string{events.Attach.String(), events.AutoUpdate.String(), events.Checkpoint.String(), events.Cleanup.String(),
+			events.Commit.String(), events.Create.String(), events.Exec.String(), events.ExecDied.String(),
+			events.Exited.String(), events.Export.String(), events.Import.String(), events.Init.String(), events.Kill.String(),
+			events.LoadFromArchive.String(), events.Mount.String(), events.NetworkConnect.String(),
+			events.NetworkDisconnect.String(), events.Pause.String(), events.Prune.String(), events.Pull.String(),
+			events.Push.String(), events.Refresh.String(), events.Remove.String(), events.Rename.String(),
+			events.Renumber.String(), events.Restart.String(), events.Restore.String(), events.Save.String(),
+			events.Start.String(), events.Stop.String(), events.Sync.String(), events.Tag.String(), events.Unmount.String(),
+			events.Unpause.String(), events.Untag.String(),
+		}, cobra.ShellCompDirectiveNoFileComp
+	}
 	eventTypes := func(_ string) ([]string, cobra.ShellCompDirective) {
-		return []string{"attach", "checkpoint", "cleanup", "commit", "connect", "create", "disconnect", "exec",
-			"exec_died", "exited", "export", "import", "init", "kill", "loadFromArchive", "mount", "pause",
-			"prune", "pull", "push", "refresh", "remove", "rename", "renumber", "restart", "restore", "save",
-			"start", "stop", "sync", "tag", "unmount", "unpause", "untag",
+		return []string{events.Container.String(), events.Image.String(), events.Network.String(),
+			events.Pod.String(), events.System.String(), events.Volume.String(),
 		}, cobra.ShellCompDirectiveNoFileComp
 	}
 	kv := keyValueCompletion{
@@ -1103,7 +1219,7 @@ func AutocompleteEventFilter(cmd *cobra.Command, args []string, toComplete strin
 		"image=":     func(s string) ([]string, cobra.ShellCompDirective) { return getImages(cmd, s) },
 		"pod=":       func(s string) ([]string, cobra.ShellCompDirective) { return getPods(cmd, s, completeDefault) },
 		"volume=":    func(s string) ([]string, cobra.ShellCompDirective) { return getVolumes(cmd, s) },
-		"event=":     eventTypes,
+		"event=":     event,
 		"type=":      eventTypes,
 	}
 	return completeKeyValues(toComplete, kv)
@@ -1130,9 +1246,8 @@ func AutocompleteImageSort(cmd *cobra.Command, args []string, toComplete string)
 }
 
 // AutocompleteInspectType - Autocomplete inspect type options.
-// -> "container", "image", "all"
 func AutocompleteInspectType(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-	types := []string{"container", "image", "all"}
+	types := []string{AllType, ContainerType, ImageType, NetworkType, PodType, VolumeType}
 	return types, cobra.ShellCompDirectiveNoFileComp
 }
 
@@ -1182,10 +1297,8 @@ func AutocompletePsSort(cmd *cobra.Command, args []string, toComplete string) ([
 }
 
 // AutocompleteImageSaveFormat - Autocomplete image save format options.
-// -> "oci-archive", "oci-dir", "docker-dir"
 func AutocompleteImageSaveFormat(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-	formats := []string{"oci-archive", "oci-dir", "docker-dir"}
-	return formats, cobra.ShellCompDirectiveNoFileComp
+	return ValidSaveFormats, cobra.ShellCompDirectiveNoFileComp
 }
 
 // AutocompleteWaitCondition - Autocomplete wait condition options.
@@ -1198,21 +1311,21 @@ func AutocompleteWaitCondition(cmd *cobra.Command, args []string, toComplete str
 // AutocompleteCgroupManager - Autocomplete cgroup manager options.
 // -> "cgroupfs", "systemd"
 func AutocompleteCgroupManager(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-	types := []string{"cgroupfs", "systemd"}
+	types := []string{config.CgroupfsCgroupsManager, config.SystemdCgroupsManager}
 	return types, cobra.ShellCompDirectiveNoFileComp
 }
 
 // AutocompleteEventBackend - Autocomplete event backend options.
 // -> "file", "journald", "none"
 func AutocompleteEventBackend(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-	types := []string{"file", "journald", "none"}
+	types := []string{events.LogFile.String(), events.Journald.String(), events.Null.String()}
 	return types, cobra.ShellCompDirectiveNoFileComp
 }
 
 // AutocompleteNetworkBackend - Autocomplete network backend options.
 // -> "cni", "netavark"
 func AutocompleteNetworkBackend(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-	types := []string{"cni", "netavark"}
+	types := []string{string(types.CNI), string(types.Netavark)}
 	return types, cobra.ShellCompDirectiveNoFileComp
 }
 
@@ -1225,7 +1338,7 @@ func AutocompleteLogLevel(cmd *cobra.Command, args []string, toComplete string) 
 // AutocompleteSDNotify - Autocomplete sdnotify options.
 // -> "container", "conmon", "ignore"
 func AutocompleteSDNotify(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-	types := []string{"container", "conmon", "ignore"}
+	types := []string{define.SdNotifyModeContainer, define.SdNotifyModeContainer, define.SdNotifyModeIgnore}
 	return types, cobra.ShellCompDirectiveNoFileComp
 }
 

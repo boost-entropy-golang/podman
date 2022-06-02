@@ -11,13 +11,13 @@ require (
 	github.com/container-orchestrated-devices/container-device-interface v0.4.0
 	github.com/containernetworking/cni v1.1.0
 	github.com/containernetworking/plugins v1.1.1
-	github.com/containers/buildah v1.26.1
-	github.com/containers/common v0.48.1-0.20220512112240-7536bf6ff9b1
+	github.com/containers/buildah v1.26.1-0.20220524184833-5500333c2e06
+	github.com/containers/common v0.48.1-0.20220523155016-2fd37da97824
 	github.com/containers/conmon v2.0.20+incompatible
-	github.com/containers/image/v5 v5.21.2-0.20220511203756-fe4fd4ed8be4
+	github.com/containers/image/v5 v5.21.2-0.20220520105616-e594853d6471
 	github.com/containers/ocicrypt v1.1.4-0.20220428134531-566b808bdf6f
 	github.com/containers/psgo v1.7.2
-	github.com/containers/storage v1.41.1-0.20220511210719-cacc3325a9c8
+	github.com/containers/storage v1.41.1-0.20220517121726-5019cd55275c
 	github.com/coreos/go-systemd/v22 v22.3.2
 	github.com/coreos/stream-metadata-go v0.0.0-20210225230131-70edb9eb47b3
 	github.com/cyphar/filepath-securejoin v0.2.3
@@ -61,15 +61,16 @@ require (
 	github.com/syndtr/gocapability v0.0.0-20200815063812-42c35b437635
 	github.com/uber/jaeger-client-go v2.30.0+incompatible
 	github.com/ulikunitz/xz v0.5.10
-	github.com/vbauerster/mpb/v7 v7.4.1
+	github.com/vbauerster/mpb/v7 v7.4.2
 	github.com/vishvananda/netlink v1.1.1-0.20220115184804-dd687eb2f2d4
 	go.etcd.io/bbolt v1.3.6
 	golang.org/x/crypto v0.0.0-20220411220226-7b82a4e95df4
 	golang.org/x/sync v0.0.0-20210220032951-036812b2e83c
-	golang.org/x/sys v0.0.0-20220422013727-9388b58f7150
+	golang.org/x/sys v0.0.0-20220520151302-bc2c85ada10a
 	golang.org/x/term v0.0.0-20210927222741-03fcf44c2211
 	golang.org/x/text v0.3.7
 	google.golang.org/protobuf v1.28.0
 	gopkg.in/inf.v0 v0.9.1
 	gopkg.in/yaml.v2 v2.4.0
+	gopkg.in/yaml.v3 v3.0.1 // indirect
 )

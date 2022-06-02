@@ -6,19 +6,18 @@ import (
 	"strings"
 
 	"github.com/containers/common/pkg/completion"
+	"github.com/containers/common/pkg/util"
 	"github.com/containers/podman/v4/cmd/podman/common"
 	"github.com/containers/podman/v4/cmd/podman/parse"
 	"github.com/containers/podman/v4/cmd/podman/registry"
 	"github.com/containers/podman/v4/libpod/define"
 	"github.com/containers/podman/v4/pkg/domain/entities"
-	"github.com/containers/podman/v4/pkg/util"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	"golang.org/x/term"
 )
 
 var (
-	validFormats    = []string{define.OCIManifestDir, define.OCIArchive, define.V2s2ManifestDir, define.V2s2Archive}
 	containerConfig = registry.PodmanConfig()
 )
 
@@ -38,8 +37,8 @@ var (
 			if err != nil {
 				return err
 			}
-			if !util.StringInSlice(format, validFormats) {
-				return errors.Errorf("format value must be one of %s", strings.Join(validFormats, " "))
+			if !util.StringInSlice(format, common.ValidSaveFormats) {
+				return errors.Errorf("format value must be one of %s", strings.Join(common.ValidSaveFormats, " "))
 			}
 			return nil
 		},

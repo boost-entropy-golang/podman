@@ -952,7 +952,8 @@ func (v *MachineVM) SSH(_ string, opts machine.SSHOptions) error {
 	sshDestination := username + "@localhost"
 	port := strconv.Itoa(v.Port)
 
-	args := []string{"-i", v.IdentityPath, "-p", port, sshDestination, "-o", "UserKnownHostsFile=/dev/null", "-o", "StrictHostKeyChecking=no"}
+	args := []string{"-i", v.IdentityPath, "-p", port, sshDestination, "-o", "UserKnownHostsFile=/dev/null",
+		"-o", "StrictHostKeyChecking=no", "-o", "LogLevel=ERROR"}
 	if len(opts.Args) > 0 {
 		args = append(args, opts.Args...)
 	} else {
@@ -1471,16 +1472,22 @@ func (v *MachineVM) Inspect() (*machine.InspectInfo, error) {
 	if err != nil {
 		return nil, err
 	}
-
+	connInfo := new(machine.ConnectionConfig)
+	podmanSocket, err := v.forwardSocketPath()
+	if err != nil {
+		return nil, err
+	}
+	connInfo.PodmanSocket = podmanSocket
 	return &machine.InspectInfo{
-		ConfigPath: v.ConfigPath,
-		Created:    v.Created,
-		Image:      v.ImageConfig,
-		LastUp:     v.LastUp,
-		Name:       v.Name,
-		Resources:  v.ResourceConfig,
-		SSHConfig:  v.SSHConfig,
-		State:      state,
+		ConfigPath:     v.ConfigPath,
+		ConnectionInfo: *connInfo,
+		Created:        v.Created,
+		Image:          v.ImageConfig,
+		LastUp:         v.LastUp,
+		Name:           v.Name,
+		Resources:      v.ResourceConfig,
+		SSHConfig:      v.SSHConfig,
+		State:          state,
 	}, nil
 }
 
@@ -1545,7 +1552,7 @@ func (v *MachineVM) editCmdLine(flag string, value string) {
 	}
 }
 
-// RemoveAndCleanMachines removes all machine and cleans up any other files associatied with podman machine
+// RemoveAndCleanMachines removes all machine and cleans up any other files associated with podman machine
 func (p *Provider) RemoveAndCleanMachines() error {
 	var (
 		vm             machine.VM

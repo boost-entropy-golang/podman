@@ -16,6 +16,7 @@ import (
 	"github.com/containers/common/libnetwork/types"
 	"github.com/containers/common/pkg/parse"
 	"github.com/containers/common/pkg/secrets"
+	cutil "github.com/containers/common/pkg/util"
 	"github.com/containers/image/v5/manifest"
 	"github.com/containers/podman/v4/libpod/define"
 	ann "github.com/containers/podman/v4/pkg/annotations"
@@ -356,7 +357,7 @@ func ToSpecGen(ctx context.Context, opts *CtrSpecGenOptions) (*specgen.SpecGener
 			// a selinux mount option exists for it
 			for k, v := range opts.Annotations {
 				// Make sure the z/Z option is not already there (from editing the YAML)
-				if strings.Replace(k, define.BindMountPrefix, "", 1) == volumeSource.Source && !util.StringInSlice("z", options) && !util.StringInSlice("Z", options) {
+				if strings.Replace(k, define.BindMountPrefix, "", 1) == volumeSource.Source && !cutil.StringInSlice("z", options) && !cutil.StringInSlice("Z", options) {
 					options = append(options, v)
 				}
 			}
@@ -381,6 +382,22 @@ func ToSpecGen(ctx context.Context, opts *CtrSpecGenOptions) (*specgen.SpecGener
 				Options: options,
 			}
 			s.Volumes = append(s.Volumes, &cmVolume)
+		case KubeVolumeTypeCharDevice:
+			// We are setting the path as hostPath:mountPath to comply with pkg/specgen/generate.DeviceFromPath.
+			// The type is here just to improve readability as it is not taken into account when the actual device is created.
+			device := spec.LinuxDevice{
+				Path: fmt.Sprintf("%s:%s", volumeSource.Source, volume.MountPath),
+				Type: "c",
+			}
+			s.Devices = append(s.Devices, device)
+		case KubeVolumeTypeBlockDevice:
+			// We are setting the path as hostPath:mountPath to comply with pkg/specgen/generate.DeviceFromPath.
+			// The type is here just to improve readability as it is not taken into account when the actual device is created.
+			device := spec.LinuxDevice{
+				Path: fmt.Sprintf("%s:%s", volumeSource.Source, volume.MountPath),
+				Type: "b",
+			}
+			s.Devices = append(s.Devices, device)
 		default:
 			return nil, errors.Errorf("Unsupported volume source type")
 		}

@@ -243,12 +243,12 @@ type ContainerNetworkConfig struct {
 	// This cannot be set unless CreateNetNS is set.
 	// If not set, the container will be dynamically assigned an IP by CNI.
 	// Deprecated: Do no use this anymore, this is only for DB backwards compat.
-	StaticIP net.IP `json:"staticIP"`
+	StaticIP net.IP `json:"staticIP,omitempty"`
 	// StaticMAC is a static MAC to request for the container.
 	// This cannot be set unless CreateNetNS is set.
 	// If not set, the container will be dynamically assigned a MAC by CNI.
 	// Deprecated: Do no use this anymore, this is only for DB backwards compat.
-	StaticMAC types.HardwareAddr `json:"staticMAC"`
+	StaticMAC types.HardwareAddr `json:"staticMAC,omitempty"`
 	// PortMappings are the ports forwarded to the container's network
 	// namespace
 	// These are not used unless CreateNetNS is true
@@ -372,7 +372,6 @@ type ContainerMiscConfig struct {
 	// restart the container. Used only if RestartPolicy is set to
 	// "on-failure".
 	RestartRetries uint `json:"restart_retries,omitempty"`
-	// TODO log options for log drivers
 	// PostConfigureNetNS needed when a user namespace is created by an OCI runtime
 	// if the network namespace is created before the user namespace it will be
 	// owned by the wrong user namespace.

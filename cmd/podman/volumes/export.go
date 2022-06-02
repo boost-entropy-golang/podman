@@ -6,9 +6,9 @@ import (
 
 	"github.com/containers/common/pkg/completion"
 	"github.com/containers/podman/v4/cmd/podman/common"
-	"github.com/containers/podman/v4/cmd/podman/inspect"
 	"github.com/containers/podman/v4/cmd/podman/registry"
 	"github.com/containers/podman/v4/pkg/domain/entities"
+	"github.com/containers/podman/v4/pkg/errorhandling"
 	"github.com/containers/podman/v4/utils"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
@@ -58,10 +58,13 @@ func export(cmd *cobra.Command, args []string) error {
 	if cliExportOpts.Output == "" {
 		return errors.New("expects output path, use --output=[path]")
 	}
-	inspectOpts.Type = inspect.VolumeType
-	volumeData, _, err := containerEngine.VolumeInspect(ctx, args, inspectOpts)
+	inspectOpts.Type = common.VolumeType
+	volumeData, errs, err := containerEngine.VolumeInspect(ctx, args, inspectOpts)
 	if err != nil {
 		return err
+	}
+	if len(errs) > 0 {
+		return errorhandling.JoinErrors(errs)
 	}
 	if len(volumeData) < 1 {
 		return errors.New("no volume data found")

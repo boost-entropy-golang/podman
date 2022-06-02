@@ -87,7 +87,7 @@ github.com/containernetworking/cni/pkg/version
 # github.com/containernetworking/plugins v1.1.1
 ## explicit
 github.com/containernetworking/plugins/pkg/ns
-# github.com/containers/buildah v1.26.1
+# github.com/containers/buildah v1.26.1-0.20220524184833-5500333c2e06
 ## explicit
 github.com/containers/buildah
 github.com/containers/buildah/bind
@@ -109,9 +109,10 @@ github.com/containers/buildah/pkg/rusage
 github.com/containers/buildah/pkg/sshagent
 github.com/containers/buildah/pkg/util
 github.com/containers/buildah/util
-# github.com/containers/common v0.48.1-0.20220512112240-7536bf6ff9b1
+# github.com/containers/common v0.48.1-0.20220523155016-2fd37da97824
 ## explicit
 github.com/containers/common/libimage
+github.com/containers/common/libimage/define
 github.com/containers/common/libimage/manifests
 github.com/containers/common/libnetwork/cni
 github.com/containers/common/libnetwork/etchosts
@@ -155,7 +156,7 @@ github.com/containers/common/version
 # github.com/containers/conmon v2.0.20+incompatible
 ## explicit
 github.com/containers/conmon/runner/config
-# github.com/containers/image/v5 v5.21.2-0.20220511203756-fe4fd4ed8be4
+# github.com/containers/image/v5 v5.21.2-0.20220520105616-e594853d6471
 ## explicit
 github.com/containers/image/v5/copy
 github.com/containers/image/v5/directory
@@ -235,7 +236,7 @@ github.com/containers/psgo/internal/dev
 github.com/containers/psgo/internal/host
 github.com/containers/psgo/internal/proc
 github.com/containers/psgo/internal/process
-# github.com/containers/storage v1.41.1-0.20220511210719-cacc3325a9c8
+# github.com/containers/storage v1.41.1-0.20220517121726-5019cd55275c
 ## explicit
 github.com/containers/storage
 github.com/containers/storage/drivers
@@ -594,7 +595,7 @@ github.com/pkg/errors
 # github.com/pmezard/go-difflib v1.0.0
 ## explicit
 github.com/pmezard/go-difflib/difflib
-# github.com/proglottis/gpgme v0.1.1
+# github.com/proglottis/gpgme v0.1.2
 github.com/proglottis/gpgme
 # github.com/prometheus/client_golang v1.11.1
 github.com/prometheus/client_golang/prometheus
@@ -669,7 +670,7 @@ github.com/ulikunitz/xz/lzma
 github.com/vbatts/tar-split/archive/tar
 github.com/vbatts/tar-split/tar/asm
 github.com/vbatts/tar-split/tar/storage
-# github.com/vbauerster/mpb/v7 v7.4.1
+# github.com/vbauerster/mpb/v7 v7.4.2
 ## explicit
 github.com/vbauerster/mpb/v7
 github.com/vbauerster/mpb/v7/cwriter
@@ -734,7 +735,7 @@ golang.org/x/net/trace
 ## explicit
 golang.org/x/sync/errgroup
 golang.org/x/sync/semaphore
-# golang.org/x/sys v0.0.0-20220422013727-9388b58f7150
+# golang.org/x/sys v0.0.0-20220520151302-bc2c85ada10a
 ## explicit
 golang.org/x/sys/cpu
 golang.org/x/sys/execabs
@@ -863,7 +864,8 @@ gopkg.in/tomb.v1
 # gopkg.in/yaml.v2 v2.4.0
 ## explicit
 gopkg.in/yaml.v2
-# gopkg.in/yaml.v3 v3.0.0-20210107192922-496545a6307b
+# gopkg.in/yaml.v3 v3.0.1
+## explicit
 gopkg.in/yaml.v3
 # sigs.k8s.io/yaml v1.3.0
 sigs.k8s.io/yaml
