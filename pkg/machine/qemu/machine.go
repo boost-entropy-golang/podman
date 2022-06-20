@@ -16,9 +16,11 @@ import (
 	"net/url"
 	"os"
 	"os/exec"
+	"os/signal"
 	"path/filepath"
 	"strconv"
 	"strings"
+	"syscall"
 	"time"
 
 	"github.com/containers/common/pkg/config"
@@ -484,12 +486,26 @@ func (v *MachineVM) Start(name string, _ machine.StartOptions) error {
 	if err := v.writeConfig(); err != nil {
 		return fmt.Errorf("writing JSON file: %w", err)
 	}
-	defer func() {
+	doneStarting := func() {
 		v.Starting = false
 		if err := v.writeConfig(); err != nil {
 			logrus.Errorf("Writing JSON file: %v", err)
 		}
+	}
+	defer doneStarting()
+
+	c := make(chan os.Signal, 1)
+	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
+	go func() {
+		_, ok := <-c
+		if !ok {
+			return
+		}
+		doneStarting()
+		os.Exit(1)
 	}()
+	defer close(c)
+
 	if v.isIncompatible() {
 		logrus.Errorf("machine %q is incompatible with this release of podman and needs to be recreated, starting for recovery only", v.Name)
 	}
@@ -770,7 +786,7 @@ func (v *MachineVM) Stop(_ string, _ machine.StopOptions) error {
 
 	if err := qmpMonitor.Disconnect(); err != nil {
 		// FIXME: this error should probably be returned
-		return nil // nolint: nilerr
+		return nil //nolint: nilerr
 	}
 
 	disconnected = true
@@ -831,8 +847,14 @@ func (v *MachineVM) Remove(_ string, opts machine.RemoveOptions) (string, func()
 	if err != nil {
 		return "", nil, err
 	}
-	if state == machine.Running && !opts.Force {
-		return "", nil, errors.Errorf("running vm %q cannot be destroyed", v.Name)
+	if state == machine.Running {
+		if !opts.Force {
+			return "", nil, errors.Errorf("running vm %q cannot be destroyed", v.Name)
+		}
+		err := v.Stop(v.Name, machine.StopOptions{})
+		if err != nil {
+			return "", nil, err
+		}
 	}
 
 	// Collect all the files that need to be destroyed
@@ -904,7 +926,7 @@ func (v *MachineVM) State(bypass bool) (machine.Status, error) {
 	}
 	// Check if we can dial it
 	if v.Starting && !bypass {
-		return "", nil
+		return machine.Starting, nil
 	}
 	monitor, err := qmp.NewSocketMonitor(v.QMPMonitor.Network, v.QMPMonitor.Address.GetPath(), v.QMPMonitor.Timeout)
 	if err != nil {
@@ -1075,8 +1097,11 @@ func getVMInfos() ([]*machine.ListResponse, error) {
 					return err
 				}
 			}
-			if state == machine.Running {
+			switch state {
+			case machine.Running:
 				listEntry.Running = true
+			case machine.Starting:
+				listEntry.Starting = true
 			}
 
 			listed = append(listed, listEntry)
@@ -1109,7 +1134,7 @@ func (p *Provider) CheckExclusiveActiveVM() (bool, string, error) {
 		return false, "", errors.Wrap(err, "error checking VM active")
 	}
 	for _, vm := range vms {
-		if vm.Running {
+		if vm.Running || vm.Starting {
 			return true, vm.Name, nil
 		}
 	}

@@ -303,8 +303,8 @@ func FinishThrottleDevices(s *specgen.SpecGenerator) error {
 			if err := unix.Stat(k, &statT); err != nil {
 				return err
 			}
-			v.Major = (int64(unix.Major(uint64(statT.Rdev)))) // nolint: unconvert
-			v.Minor = (int64(unix.Minor(uint64(statT.Rdev)))) // nolint: unconvert
+			v.Major = (int64(unix.Major(uint64(statT.Rdev)))) //nolint: unconvert
+			v.Minor = (int64(unix.Minor(uint64(statT.Rdev)))) //nolint: unconvert
 			if s.ResourceLimits.BlockIO == nil {
 				s.ResourceLimits.BlockIO = new(spec.LinuxBlockIO)
 			}
@@ -317,8 +317,8 @@ func FinishThrottleDevices(s *specgen.SpecGenerator) error {
 			if err := unix.Stat(k, &statT); err != nil {
 				return err
 			}
-			v.Major = (int64(unix.Major(uint64(statT.Rdev)))) // nolint: unconvert
-			v.Minor = (int64(unix.Minor(uint64(statT.Rdev)))) // nolint: unconvert
+			v.Major = (int64(unix.Major(uint64(statT.Rdev)))) //nolint: unconvert
+			v.Minor = (int64(unix.Minor(uint64(statT.Rdev)))) //nolint: unconvert
 			s.ResourceLimits.BlockIO.ThrottleWriteBpsDevice = append(s.ResourceLimits.BlockIO.ThrottleWriteBpsDevice, v)
 		}
 	}
@@ -328,8 +328,8 @@ func FinishThrottleDevices(s *specgen.SpecGenerator) error {
 			if err := unix.Stat(k, &statT); err != nil {
 				return err
 			}
-			v.Major = (int64(unix.Major(uint64(statT.Rdev)))) // nolint: unconvert
-			v.Minor = (int64(unix.Minor(uint64(statT.Rdev)))) // nolint: unconvert
+			v.Major = (int64(unix.Major(uint64(statT.Rdev)))) //nolint: unconvert
+			v.Minor = (int64(unix.Minor(uint64(statT.Rdev)))) //nolint: unconvert
 			s.ResourceLimits.BlockIO.ThrottleReadIOPSDevice = append(s.ResourceLimits.BlockIO.ThrottleReadIOPSDevice, v)
 		}
 	}
@@ -339,8 +339,8 @@ func FinishThrottleDevices(s *specgen.SpecGenerator) error {
 			if err := unix.Stat(k, &statT); err != nil {
 				return err
 			}
-			v.Major = (int64(unix.Major(uint64(statT.Rdev)))) // nolint: unconvert
-			v.Minor = (int64(unix.Minor(uint64(statT.Rdev)))) // nolint: unconvert
+			v.Major = (int64(unix.Major(uint64(statT.Rdev)))) //nolint: unconvert
+			v.Minor = (int64(unix.Minor(uint64(statT.Rdev)))) //nolint: unconvert
 			s.ResourceLimits.BlockIO.ThrottleWriteIOPSDevice = append(s.ResourceLimits.BlockIO.ThrottleWriteIOPSDevice, v)
 		}
 	}
@@ -450,7 +450,7 @@ func ConfigToSpec(rt *libpod.Runtime, specg *specgen.SpecGenerator, contaierID s
 					specg.IpcNS = specgen.Namespace{NSMode: specgen.Default} // default
 				}
 			case "uts":
-				specg.UtsNS = specgen.Namespace{NSMode: specgen.Default} // default
+				specg.UtsNS = specgen.Namespace{NSMode: specgen.Private} // default
 			case "user":
 				if conf.AddCurrentUserPasswdEntry {
 					specg.UserNS = specgen.Namespace{NSMode: specgen.KeepID}

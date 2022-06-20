@@ -81,6 +81,13 @@ func Build(ctx context.Context, containerFiles []string, options entities.BuildO
 	for _, tag := range options.AdditionalTags {
 		params.Add("t", tag)
 	}
+	if additionalBuildContexts := options.AdditionalBuildContexts; len(additionalBuildContexts) > 0 {
+		additionalBuildContextMap, err := jsoniter.Marshal(additionalBuildContexts)
+		if err != nil {
+			return nil, err
+		}
+		params.Set("additionalbuildcontexts", string(additionalBuildContextMap))
+	}
 	if buildArgs := options.Args; len(buildArgs) > 0 {
 		bArgs, err := jsoniter.MarshalToString(buildArgs)
 		if err != nil {
@@ -162,6 +169,11 @@ func Build(ctx context.Context, containerFiles []string, options entities.BuildO
 		params.Set("rm", "1")
 	} else {
 		params.Set("rm", "0")
+	}
+	if options.CommonBuildOpts.OmitHistory {
+		params.Set("omithistory", "1")
+	} else {
+		params.Set("omithistory", "0")
 	}
 	if len(options.From) > 0 {
 		params.Set("from", options.From)
@@ -609,7 +621,7 @@ func nTar(excludes []string, sources ...string) (io.ReadCloser, error) {
 				}
 				name := filepath.ToSlash(strings.TrimPrefix(path, s+string(filepath.Separator)))
 
-				excluded, err := pm.Matches(name) // nolint:staticcheck
+				excluded, err := pm.Matches(name) //nolint:staticcheck
 				if err != nil {
 					return errors.Wrapf(err, "error checking if %q is excluded", name)
 				}

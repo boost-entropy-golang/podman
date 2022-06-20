@@ -435,6 +435,21 @@ func WithDefaultInfraCommand(cmd string) RuntimeOption {
 	}
 }
 
+// WithReset instructs libpod to reset all storage to factory defaults.
+// All containers, pods, volumes, images, and networks will be removed.
+// All directories created by Libpod will be removed.
+func WithReset() RuntimeOption {
+	return func(rt *Runtime) error {
+		if rt.valid {
+			return define.ErrRuntimeFinalized
+		}
+
+		rt.doReset = true
+
+		return nil
+	}
+}
+
 // WithRenumber instructs libpod to perform a lock renumbering while
 // initializing. This will handle migrations from early versions of libpod with
 // file locks to newer versions with SHM locking, as well as changes in the
@@ -2155,6 +2170,20 @@ func WithPasswdEntry(passwdEntry string) CtrCreateOption {
 		}
 
 		ctr.config.PasswdEntry = passwdEntry
+
+		return nil
+	}
+}
+
+// WithMountAllDevices sets the option to mount all of a privileged container's
+// host devices
+func WithMountAllDevices() CtrCreateOption {
+	return func(ctr *Container) error {
+		if ctr.valid {
+			return define.ErrCtrFinalized
+		}
+
+		ctr.config.MountAllDevices = true
 
 		return nil
 	}

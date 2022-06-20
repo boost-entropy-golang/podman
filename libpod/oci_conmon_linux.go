@@ -411,8 +411,8 @@ func (r *ConmonOCIRuntime) KillContainer(ctr *Container, signal uint, all bool) 
 		if err2 := r.UpdateContainerStatus(ctr); err2 != nil {
 			logrus.Infof("Error updating status for container %s: %v", ctr.ID(), err2)
 		}
-		if ctr.state.State == define.ContainerStateExited {
-			return nil
+		if ctr.ensureState(define.ContainerStateStopped, define.ContainerStateExited) {
+			return define.ErrCtrStateInvalid
 		}
 		return errors.Wrapf(err, "error sending signal to container %s", ctr.ID())
 	}
@@ -1014,7 +1014,7 @@ func (r *ConmonOCIRuntime) getLogTag(ctr *Container) (string, error) {
 	data, err := ctr.inspectLocked(false)
 	if err != nil {
 		// FIXME: this error should probably be returned
-		return "", nil // nolint: nilerr
+		return "", nil //nolint: nilerr
 	}
 	tmpl, err := template.New("container").Parse(logTag)
 	if err != nil {
@@ -1435,7 +1435,7 @@ func (r *ConmonOCIRuntime) moveConmonToCgroupAndSignal(ctr *Container, cmd *exec
 	}
 
 	// $INVOCATION_ID is set by systemd when running as a service.
-	if os.Getenv("INVOCATION_ID") != "" {
+	if ctr.runtime.RemoteURI() == "" && os.Getenv("INVOCATION_ID") != "" {
 		mustCreateCgroup = false
 	}
 

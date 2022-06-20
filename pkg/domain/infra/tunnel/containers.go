@@ -570,7 +570,7 @@ func (ic *ContainerEngine) ContainerExecDetached(ctx context.Context, nameOrID s
 	return sessionID, nil
 }
 
-func startAndAttach(ic *ContainerEngine, name string, detachKeys *string, input, output, errput *os.File) error { //nolint
+func startAndAttach(ic *ContainerEngine, name string, detachKeys *string, input, output, errput *os.File) error {
 	attachErr := make(chan error)
 	attachReady := make(chan bool)
 	options := new(containers.AttachOptions).WithStream(true)
@@ -863,7 +863,7 @@ func (ic *ContainerEngine) ContainerRun(ctx context.Context, opts entities.Conta
 	if eventsErr != nil || lastEvent == nil {
 		logrus.Errorf("Cannot get exit code: %v", err)
 		report.ExitCode = define.ExecErrorCodeNotFound
-		return &report, nil // nolint: nilerr
+		return &report, nil //nolint: nilerr
 	}
 
 	report.ExitCode = lastEvent.ContainerExitCode
@@ -949,7 +949,7 @@ func (ic *ContainerEngine) ContainerPort(ctx context.Context, nameOrID string, o
 }
 
 func (ic *ContainerEngine) ContainerCopyFromArchive(ctx context.Context, nameOrID, path string, reader io.Reader, options entities.CopyOptions) (entities.ContainerCopyFunc, error) {
-	copyOptions := new(containers.CopyOptions).WithChown(options.Chown).WithRename(options.Rename)
+	copyOptions := new(containers.CopyOptions).WithChown(options.Chown).WithRename(options.Rename).WithNoOverwriteDirNonDir(options.NoOverwriteDirNonDir)
 	return containers.CopyFromArchiveWithOptions(ic.ClientCtx, nameOrID, path, reader, copyOptions)
 }
 

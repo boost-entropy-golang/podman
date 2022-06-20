@@ -70,68 +70,70 @@ func BuildImage(w http.ResponseWriter, r *http.Request) {
 	}()
 
 	query := struct {
-		AddHosts               string   `schema:"extrahosts"`
-		AdditionalCapabilities string   `schema:"addcaps"`
-		AllPlatforms           bool     `schema:"allplatforms"`
-		Annotations            string   `schema:"annotations"`
-		AppArmor               string   `schema:"apparmor"`
-		BuildArgs              string   `schema:"buildargs"`
-		CacheFrom              string   `schema:"cachefrom"`
-		CgroupParent           string   `schema:"cgroupparent"` // nolint
-		Compression            uint64   `schema:"compression"`
-		ConfigureNetwork       string   `schema:"networkmode"`
-		CPPFlags               string   `schema:"cppflags"`
-		CpuPeriod              uint64   `schema:"cpuperiod"`  // nolint
-		CpuQuota               int64    `schema:"cpuquota"`   // nolint
-		CpuSetCpus             string   `schema:"cpusetcpus"` // nolint
-		CpuSetMems             string   `schema:"cpusetmems"` // nolint
-		CpuShares              uint64   `schema:"cpushares"`  // nolint
-		DNSOptions             string   `schema:"dnsoptions"`
-		DNSSearch              string   `schema:"dnssearch"`
-		DNSServers             string   `schema:"dnsservers"`
-		Devices                string   `schema:"devices"`
-		Dockerfile             string   `schema:"dockerfile"`
-		DropCapabilities       string   `schema:"dropcaps"`
-		Envs                   []string `schema:"setenv"`
-		Excludes               string   `schema:"excludes"`
-		ForceRm                bool     `schema:"forcerm"`
-		From                   string   `schema:"from"`
-		HTTPProxy              bool     `schema:"httpproxy"`
-		IdentityLabel          bool     `schema:"identitylabel"`
-		Ignore                 bool     `schema:"ignore"`
-		Isolation              string   `schema:"isolation"`
-		Jobs                   int      `schema:"jobs"` // nolint
-		LabelOpts              string   `schema:"labelopts"`
-		Labels                 string   `schema:"labels"`
-		Layers                 bool     `schema:"layers"`
-		LogRusage              bool     `schema:"rusage"`
-		Manifest               string   `schema:"manifest"`
-		MemSwap                int64    `schema:"memswap"`
-		Memory                 int64    `schema:"memory"`
-		NamespaceOptions       string   `schema:"nsoptions"`
-		NoCache                bool     `schema:"nocache"`
-		OSFeatures             []string `schema:"osfeature"`
-		OSVersion              string   `schema:"osversion"`
-		OutputFormat           string   `schema:"outputformat"`
-		Platform               []string `schema:"platform"`
-		Pull                   bool     `schema:"pull"`
-		PullPolicy             string   `schema:"pullpolicy"`
-		Quiet                  bool     `schema:"q"`
-		Registry               string   `schema:"registry"`
-		Rm                     bool     `schema:"rm"`
-		RusageLogFile          string   `schema:"rusagelogfile"`
-		Remote                 string   `schema:"remote"`
-		Seccomp                string   `schema:"seccomp"`
-		Secrets                string   `schema:"secrets"`
-		SecurityOpt            string   `schema:"securityopt"`
-		ShmSize                int      `schema:"shmsize"`
-		Squash                 bool     `schema:"squash"`
-		TLSVerify              bool     `schema:"tlsVerify"`
-		Tags                   []string `schema:"t"`
-		Target                 string   `schema:"target"`
-		Timestamp              int64    `schema:"timestamp"`
-		Ulimits                string   `schema:"ulimits"`
-		UnsetEnvs              []string `schema:"unsetenv"`
+		AddHosts                string   `schema:"extrahosts"`
+		AdditionalCapabilities  string   `schema:"addcaps"`
+		AdditionalBuildContexts string   `schema:"additionalbuildcontexts"`
+		AllPlatforms            bool     `schema:"allplatforms"`
+		Annotations             string   `schema:"annotations"`
+		AppArmor                string   `schema:"apparmor"`
+		BuildArgs               string   `schema:"buildargs"`
+		CacheFrom               string   `schema:"cachefrom"`
+		CgroupParent            string   `schema:"cgroupparent"`
+		Compression             uint64   `schema:"compression"`
+		ConfigureNetwork        string   `schema:"networkmode"`
+		CPPFlags                string   `schema:"cppflags"`
+		CpuPeriod               uint64   `schema:"cpuperiod"`  //nolint:revive,stylecheck
+		CpuQuota                int64    `schema:"cpuquota"`   //nolint:revive,stylecheck
+		CpuSetCpus              string   `schema:"cpusetcpus"` //nolint:revive,stylecheck
+		CpuSetMems              string   `schema:"cpusetmems"` //nolint:revive,stylecheck
+		CpuShares               uint64   `schema:"cpushares"`  //nolint:revive,stylecheck
+		DNSOptions              string   `schema:"dnsoptions"`
+		DNSSearch               string   `schema:"dnssearch"`
+		DNSServers              string   `schema:"dnsservers"`
+		Devices                 string   `schema:"devices"`
+		Dockerfile              string   `schema:"dockerfile"`
+		DropCapabilities        string   `schema:"dropcaps"`
+		Envs                    []string `schema:"setenv"`
+		Excludes                string   `schema:"excludes"`
+		ForceRm                 bool     `schema:"forcerm"`
+		From                    string   `schema:"from"`
+		HTTPProxy               bool     `schema:"httpproxy"`
+		IdentityLabel           bool     `schema:"identitylabel"`
+		Ignore                  bool     `schema:"ignore"`
+		Isolation               string   `schema:"isolation"`
+		Jobs                    int      `schema:"jobs"`
+		LabelOpts               string   `schema:"labelopts"`
+		Labels                  string   `schema:"labels"`
+		Layers                  bool     `schema:"layers"`
+		LogRusage               bool     `schema:"rusage"`
+		Manifest                string   `schema:"manifest"`
+		MemSwap                 int64    `schema:"memswap"`
+		Memory                  int64    `schema:"memory"`
+		NamespaceOptions        string   `schema:"nsoptions"`
+		NoCache                 bool     `schema:"nocache"`
+		OmitHistory             bool     `schema:"omithistory"`
+		OSFeatures              []string `schema:"osfeature"`
+		OSVersion               string   `schema:"osversion"`
+		OutputFormat            string   `schema:"outputformat"`
+		Platform                []string `schema:"platform"`
+		Pull                    bool     `schema:"pull"`
+		PullPolicy              string   `schema:"pullpolicy"`
+		Quiet                   bool     `schema:"q"`
+		Registry                string   `schema:"registry"`
+		Rm                      bool     `schema:"rm"`
+		RusageLogFile           string   `schema:"rusagelogfile"`
+		Remote                  string   `schema:"remote"`
+		Seccomp                 string   `schema:"seccomp"`
+		Secrets                 string   `schema:"secrets"`
+		SecurityOpt             string   `schema:"securityopt"`
+		ShmSize                 int      `schema:"shmsize"`
+		Squash                  bool     `schema:"squash"`
+		TLSVerify               bool     `schema:"tlsVerify"`
+		Tags                    []string `schema:"t"`
+		Target                  string   `schema:"target"`
+		Timestamp               int64    `schema:"timestamp"`
+		Ulimits                 string   `schema:"ulimits"`
+		UnsetEnvs               []string `schema:"unsetenv"`
 	}{
 		Dockerfile:    "Dockerfile",
 		IdentityLabel: true,
@@ -365,7 +367,7 @@ func BuildImage(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 	}
-	var additionalTags []string // nolint
+	var additionalTags []string
 	for i := 1; i < len(tags); i++ {
 		possiblyNormalizedTag, err := utils.NormalizeToDockerHub(r, tags[i])
 		if err != nil {
@@ -373,6 +375,14 @@ func BuildImage(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		additionalTags = append(additionalTags, possiblyNormalizedTag)
+	}
+
+	var additionalBuildContexts = map[string]*buildahDefine.AdditionalBuildContext{}
+	if _, found := r.URL.Query()["additionalbuildcontexts"]; found {
+		if err := json.Unmarshal([]byte(query.AdditionalBuildContexts), &additionalBuildContexts); err != nil {
+			utils.BadRequest(w, "additionalbuildcontexts", query.AdditionalBuildContexts, err)
+			return
+		}
 	}
 
 	var buildArgs = map[string]string{}
@@ -562,12 +572,13 @@ func BuildImage(w http.ResponseWriter, r *http.Request) {
 
 	runtime := r.Context().Value(api.RuntimeKey).(*libpod.Runtime)
 	buildOptions := buildahDefine.BuildOptions{
-		AddCapabilities: addCaps,
-		AdditionalTags:  additionalTags,
-		Annotations:     annotations,
-		CPPFlags:        cppflags,
-		Args:            buildArgs,
-		AllPlatforms:    query.AllPlatforms,
+		AddCapabilities:         addCaps,
+		AdditionalBuildContexts: additionalBuildContexts,
+		AdditionalTags:          additionalTags,
+		Annotations:             annotations,
+		CPPFlags:                cppflags,
+		Args:                    buildArgs,
+		AllPlatforms:            query.AllPlatforms,
 		CommonBuildOpts: &buildah.CommonBuildOptions{
 			AddHost:            addhosts,
 			ApparmorProfile:    apparmor,
@@ -585,6 +596,7 @@ func BuildImage(w http.ResponseWriter, r *http.Request) {
 			LabelOpts:          labelOpts,
 			Memory:             query.Memory,
 			MemorySwap:         query.MemSwap,
+			OmitHistory:        query.OmitHistory,
 			SeccompProfilePath: seccomp,
 			ShmSize:            strconv.Itoa(query.ShmSize),
 			Ulimit:             ulimits,
@@ -789,7 +801,7 @@ func parseNetworkConfigurationPolicy(network string) buildah.NetworkConfiguratio
 	}
 }
 
-func parseLibPodIsolation(isolation string) (buildah.Isolation, error) { // nolint
+func parseLibPodIsolation(isolation string) (buildah.Isolation, error) {
 	if val, err := strconv.Atoi(isolation); err == nil {
 		return buildah.Isolation(val), nil
 	}

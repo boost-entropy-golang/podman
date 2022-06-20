@@ -337,14 +337,8 @@ func SpecGenToOCI(ctx context.Context, s *specgen.SpecGenerator, rt *libpod.Runt
 	}
 
 	var userDevices []spec.LinuxDevice
-	if s.Privileged {
-		// If privileged, we need to add all the host devices to the
-		// spec.  We do not add the user provided ones because we are
-		// already adding them all.
-		if err := addPrivilegedDevices(&g); err != nil {
-			return nil, err
-		}
-	} else {
+
+	if !s.Privileged {
 		// add default devices from containers.conf
 		for _, device := range rtc.Containers.Devices {
 			if err = DevicesFromPath(&g, device); err != nil {
@@ -377,7 +371,7 @@ func SpecGenToOCI(ctx context.Context, s *specgen.SpecGenerator, rt *libpod.Runt
 		if err := unix.Stat(k, &statT); err != nil {
 			return nil, errors.Wrapf(err, "failed to inspect '%s' in --blkio-weight-device", k)
 		}
-		g.AddLinuxResourcesBlockIOWeightDevice((int64(unix.Major(uint64(statT.Rdev)))), (int64(unix.Minor(uint64(statT.Rdev)))), *v.Weight) // nolint: unconvert
+		g.AddLinuxResourcesBlockIOWeightDevice((int64(unix.Major(uint64(statT.Rdev)))), (int64(unix.Minor(uint64(statT.Rdev)))), *v.Weight) //nolint: unconvert
 	}
 
 	BlockAccessToKernelFilesystems(s.Privileged, s.PidNS.IsHost(), s.Mask, s.Unmask, &g)

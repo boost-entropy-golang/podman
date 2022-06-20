@@ -99,7 +99,7 @@ different stages in COPY instruction.
 
 Valid values could be:
 
-* Local directory – e.g. --build-context project2=../path/to/project2/src
+* Local directory – e.g. --build-context project2=../path/to/project2/src (This option is not available with the remote Podman client. On Podman machine setup (i.e macOS and Winows) path must exists on the machine VM)
 * HTTP URL to a tarball – e.g. --build-context src=https://example.org/releases/src.tar
 * Container image – specified with a container-image:// prefix, e.g. --build-context alpine=container-image://alpine:3.15, (also accepts docker://, docker-image://)
 
@@ -427,6 +427,16 @@ BUILDAH\_LAYERS environment variable. `export BUILDAH_LAYERS=true`
 
 Log output which would be sent to standard output and standard error to the
 specified file instead of to standard output and standard error.
+This option is not supported on the remote client, including Mac and Windows
+(excluding WSL2) machines.
+
+#### **--logsplit** *bool-value*
+
+If `--logfile` and `--platform` are specified, the `--logsplit` option allows
+end-users to split the log file for each platform into different files in the
+following format: `${logfile}_${platform-os}_${platform-arch}`.
+This option is not supported on the remote client, including Mac and Windows
+(excluding WSL2) machines.
 
 #### **--manifest** "manifest"
 
@@ -435,8 +445,8 @@ if it does not exist. This option is useful for building multi architecture imag
 
 #### **--memory**, **-m**=*LIMIT*
 
-Memory limit (format: `<number>[<unit>]`, where unit = b (bytes), k (kilobytes),
-m (megabytes), or g (gigabytes))
+Memory limit (format: `<number>[<unit>]`, where unit = b (bytes), k (kibibytes),
+m (mebibytes), or g (gibibytes))
 
 Allows you to constrain the memory available to a container. If the host
 supports swap memory, then the **-m** memory setting can be larger than physical
@@ -453,7 +463,7 @@ A limit value equal to memory plus swap. Must be used with the  **-m**
 the value of --memory.
 
 The format of `LIMIT` is `<number>[<unit>]`. Unit can be `b` (bytes),
-`k` (kilobytes), `m` (megabytes), or `g` (gigabytes). If you don't specify a
+`k` (kibibytes), `m` (mebibytes), or `g` (gibibytes). If you don't specify a
 unit, `b` is used. Set LIMIT to `-1` to enable unlimited swap.
 
 #### **--network**=*mode*, **--net**
@@ -481,6 +491,15 @@ Do not create _/etc/hosts_ for the container.
 By default, Podman will manage _/etc/hosts_, adding the container's own IP address and any hosts from **--add-host**.
 **--no-hosts** disables this, and the image's _/etc/hosts_ will be preserved unmodified.
 This option conflicts with **--add-host**.
+
+#### **--omit-history**
+
+Omit build history information in the built image. (default false).
+
+This option is useful for the cases where end users explicitly
+want to set `--omit-history` to omit the optional `History` from
+built images or when working with images built using build tools that
+do not include `History` information in their images.
 
 #### **--os**=*string*
 
@@ -631,8 +650,8 @@ as a seccomp filter
 
 Size of `/dev/shm`. The format is `<number><unit>`. `number` must be greater
 than `0`.
-Unit is optional and can be `b` (bytes), `k` (kilobytes), `m`(megabytes), or
-`g` (gigabytes). If you omit the unit, the system uses bytes. If you omit the
+Unit is optional and can be `b` (bytes), `k` (kibibytes), `m`(mebibytes), or
+`g` (gibibytes). If you omit the unit, the system uses bytes. If you omit the
 size entirely, the system uses `64m`.
 
 #### **--sign-by**=*fingerprint*
@@ -913,12 +932,10 @@ container. When the mount propagation policy is set to `slave`, one way mount
 propagation is enabled and any mounts completed on the host for that volume will
 be visible only inside of the container. To control the mount propagation
 property of volume use the `:[r]shared`, `:[r]slave` or `:[r]private`
-propagation flag. The propagation property can be specified only for bind mounted
-volumes and not for internal volumes or named volumes. For mount propagation to
-work on the source mount point (mount point where source dir is mounted on) has
-to have the right propagation properties. For shared volumes, the source mount
-point has to be shared. And for slave volumes, the source mount has to be either
-shared or slave. <sup>[[1]](#Footnote1)</sup>
+propagation flag. For mount propagation to work on the source mount point (mount
+point where source dir is mounted on) has to have the right propagation properties.
+For shared volumes, the source mount point has to be shared. And for slave volumes,
+the source mount has to be either shared or slave. <sup>[[1]](#Footnote1)</sup>
 
 Use `df <source-dir>` to determine the source mount and then use
 `findmnt -o TARGET,PROPAGATION <source-mount-dir>` to determine propagation

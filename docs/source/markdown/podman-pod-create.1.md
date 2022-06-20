@@ -227,16 +227,30 @@ Set the PID mode for the pod. The default is to create a private PID namespace f
 
 Write the pod ID to the file.
 
-#### **--publish**=*port*, **-p**
+#### **--publish**, **-p**=[[_ip_:][_hostPort_]:]_containerPort_[/_protocol_]
 
-Publish a port or range of ports from the pod to the host.
+Publish a container's port, or range of ports, within this pod to the host.
 
-Format: `ip:hostPort:containerPort | ip::containerPort | hostPort:containerPort | containerPort`
 Both hostPort and containerPort can be specified as a range of ports.
-When specifying ranges for both, the number of container ports in the range must match the number of host ports in the range.
-Use `podman port` to see the actual mapping: `podman port CONTAINER $CONTAINERPORT`.
+When specifying ranges for both, the number of container ports in the
+range must match the number of host ports in the range.
 
-NOTE: This cannot be modified once the pod is created.
+If host IP is set to 0.0.0.0 or not set at all, the port will be bound on all IPs on the host.
+
+By default, Podman will publish TCP ports. To publish a UDP port instead, give
+`udp` as protocol. To publish both TCP and UDP ports, set `--publish` twice,
+with `tcp`, and `udp` as protocols respectively. Rootful containers can also
+publish ports using the `sctp` protocol.
+
+Host port does not have to be specified (e.g. `podman run -p 127.0.0.1::80`).
+If it is not, the container port will be randomly assigned a port on the host.
+
+Use **podman port** to see the actual mapping: `podman port $CONTAINER $CONTAINERPORT`.
+
+**Note:** You must not publish ports of containers in the pod individually,
+but only by the pod itself.
+
+**Note:** This cannot be modified once the pod is created.
 
 #### **--replace**
 
@@ -346,9 +360,9 @@ Valid _mode_ values are:
 
   - *host*: run in the user namespace of the caller. The processes running in the container will have the same privileges on the host as any other process launched by the calling user (default).
 
-  - *keep-id*: creates a user namespace where the current rootless user's UID:GID are mapped to the same values in the container. This option is ignored for containers created by the root user.
+  - *keep-id*: creates a user namespace where the current rootless user's UID:GID are mapped to the same values in the container. This option is not allowed for containers created by the root user.
 
-  - *nomap*: creates a user namespace where the current rootless user's UID:GID are not mapped into the container. This option is ignored for containers created by the root user.
+  - *nomap*: creates a user namespace where the current rootless user's UID:GID are not mapped into the container. This option is not allowed for containers created by the root user.
 
 #### **--volume**, **-v**[=*[[SOURCE-VOLUME|HOST-DIR:]CONTAINER-DIR[:OPTIONS]]*]
 
@@ -467,12 +481,10 @@ will be visible inside container but not the other way around. <sup>[[1]](#Footn
 
 To control mount propagation property of a volume one can use the [**r**]**shared**,
 [**r**]**slave**, [**r**]**private** or the [**r**]**unbindable** propagation flag.
-Propagation property can be specified only for bind mounted volumes and not for
-internal volumes or named volumes. For mount propagation to work the source mount
-point (the mount point where source dir is mounted on) has to have the right propagation
-properties. For shared volumes, the source mount point has to be shared. And for
-slave volumes, the source mount point has to be either shared or slave.
-<sup>[[1]](#Footnote1)</sup>
+For mount propagation to work the source mount point (the mount point where source dir
+is mounted on) has to have the right propagation properties. For shared volumes, the
+source mount point has to be shared. And for slave volumes, the source mount point
+has to be either shared or slave. <sup>[[1]](#Footnote1)</sup>
 
 If you want to recursively mount a volume and all of its submounts into a
 pod, then you can use the `rbind` option. By default the bind option is

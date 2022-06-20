@@ -61,6 +61,7 @@ func runFlags(cmd *cobra.Command) {
 	flags := cmd.Flags()
 
 	flags.SetInterspersed(false)
+	common.DefineCreateDefaults(&cliVals)
 	common.DefineCreateFlags(cmd, &cliVals, false, false)
 	common.DefineNetFlags(cmd)
 
@@ -109,7 +110,9 @@ func init() {
 }
 
 func run(cmd *cobra.Command, args []string) error {
-	var err error
+	if err := commonFlags(cmd); err != nil {
+		return err
+	}
 
 	// TODO: Breaking change should be made fatal in next major Release
 	if cliVals.TTY && cliVals.Interactive && !term.IsTerminal(int(os.Stdin.Fd())) {
@@ -122,14 +125,10 @@ func run(cmd *cobra.Command, args []string) error {
 		}
 	}
 
-	flags := cmd.Flags()
-	cliVals.Net, err = common.NetFlagsToNetOptions(nil, *flags)
-	if err != nil {
-		return err
-	}
 	runOpts.CIDFile = cliVals.CIDFile
 	runOpts.Rm = cliVals.Rm
-	if cliVals, err = CreateInit(cmd, cliVals, false); err != nil {
+	cliVals, err := CreateInit(cmd, cliVals, false)
+	if err != nil {
 		return err
 	}
 

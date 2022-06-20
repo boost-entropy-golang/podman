@@ -385,7 +385,7 @@ You need to specify multi option commands in the form of a json string.
 
 Set environment variables.
 
-This option allows arbitrary environment variables that are available for the process to be launched inside of the container. If an environment variable is specified without a value, Podman will check the host environment for a value and set the variable only if it is set on the host. If an environment variable ending in __*__ is specified, Podman will search the host environment for variables starting with the prefix and will add those variables to the container. If an environment variable with a trailing __*__ is specified, then a value must be supplied.
+This option allows arbitrary environment variables that are available for the process to be launched inside of the container. If an environment variable is specified without a value, Podman will check the host environment for a value and set the variable only if it is set on the host. As a special case, if an environment variable ending in __*__ is specified without a value, Podman will search the host environment for variables starting with the prefix and will add those variables to the container.
 
 See [**Environment**](#environment) note below for precedence and examples.
 
@@ -597,7 +597,7 @@ To specify multiple static MAC addresses per container, set multiple networks us
 
 #### **--memory**, **-m**=_number_[_unit_]
 
-Memory limit. A _unit_ can be **b** (bytes), **k** (kilobytes), **m** (megabytes), or **g** (gigabytes).
+Memory limit. A _unit_ can be **b** (bytes), **k** (kibibytes), **m** (mebibytes), or **g** (gibibytes).
 
 Allows you to constrain the memory available to a container. If the host
 supports swap memory, then the **-m** memory setting can be larger than physical
@@ -607,7 +607,7 @@ system's page size (the value would be very large, that's millions of trillions)
 
 #### **--memory-reservation**=_number_[_unit_]
 
-Memory soft limit. A _unit_ can be **b** (bytes), **k** (kilobytes), **m** (megabytes), or **g** (gigabytes).
+Memory soft limit. A _unit_ can be **b** (bytes), **k** (kibibytes), **m** (mebibytes), or **g** (gibibytes).
 
 After setting memory reservation, when the system detects memory contention
 or low memory, containers are forced to restrict their consumption to their
@@ -618,7 +618,7 @@ as memory limit.
 #### **--memory-swap**=_number_[_unit_]
 
 A limit value equal to memory plus swap.
-A _unit_ can be **b** (bytes), **k** (kilobytes), **m** (megabytes), or **g** (gigabytes).
+A _unit_ can be **b** (bytes), **k** (kibibytes), **m** (mebibytes), or **g** (gibibytes).
 
 Must be used with the **-m** (**--memory**) flag.
 The argument value should always be larger than that of
@@ -864,22 +864,27 @@ points, Apparmor/SELinux separation, and Seccomp filters are all disabled.
 
 Rootless containers cannot have more privileges than the account that launched them.
 
-#### **--publish**, **-p**=_ip_:_hostPort_:_containerPort_ | _ip_::_containerPort_ | _hostPort_:_containerPort_ | _containerPort_
+#### **--publish**, **-p**=[[_ip_:][_hostPort_]:]_containerPort_[/_protocol_]
 
 Publish a container's port, or range of ports, to the host.
 
 Both hostPort and containerPort can be specified as a range of ports.
-
-When specifying ranges for both, the number of container ports in the range must match the number of host ports in the range.
+When specifying ranges for both, the number of container ports in the
+range must match the number of host ports in the range.
 
 If host IP is set to 0.0.0.0 or not set at all, the port will be bound on all IPs on the host.
+
+By default, Podman will publish TCP ports. To publish a UDP port instead, give
+`udp` as protocol. To publish both TCP and UDP ports, set `--publish` twice,
+with `tcp`, and `udp` as protocols respectively. Rootful containers can also
+publish ports using the `sctp` protocol.
 
 Host port does not have to be specified (e.g. `podman run -p 127.0.0.1::80`).
 If it is not, the container port will be randomly assigned a port on the host.
 
-Use **podman port** to see the actual mapping: **podman port $CONTAINER $CONTAINERPORT**.
+Use **podman port** to see the actual mapping: `podman port $CONTAINER $CONTAINERPORT`.
 
-**Note:** if a container will be run within a pod, it is not necessary to publish the port for
+**Note:** If a container will be run within a pod, it is not necessary to publish the port for
 the containers in the pod. The port must only be published by the pod itself. Pod network
 stacks act like the network stack on the host - you have a variety of containers in the pod,
 and programs in the container, all sharing a single interface and IP address, and
@@ -1053,7 +1058,7 @@ Note: Labeling can be disabled for all containers by setting **label=false** in 
 
 #### **--shm-size**=_number_[_unit_]
 
-Size of _/dev/shm_. A _unit_ can be **b** (bytes), **k** (kilobytes), **m** (megabytes), or **g** (gigabytes).
+Size of _/dev/shm_. A _unit_ can be **b** (bytes), **k** (kibibytes), **m** (mebibytes), or **g** (gibibytes).
 If you omit the unit, the system uses bytes. If you omit the size entirely, the default is **64m**.
 When _size_ is **0**, there is no limit on the amount of memory used for IPC by the container.
 
@@ -1324,9 +1329,9 @@ The rootless option `--userns=keep-id` uses all the subuids and subgids of the u
 
 **host**: run in the user namespace of the caller. The processes running in the container will have the same privileges on the host as any other process launched by the calling user (default).
 
-**keep-id**: creates a user namespace where the current rootless user's UID:GID are mapped to the same values in the container. This option is ignored for containers created by the root user.
+**keep-id**: creates a user namespace where the current rootless user's UID:GID are mapped to the same values in the container. This option is not allowed for containers created by the root user.
 
-**nomap**: creates a user namespace where the current rootless user's UID:GID are not mapped into the container. This option is ignored for containers created by the root user.
+**nomap**: creates a user namespace where the current rootless user's UID:GID are not mapped into the container. This option is not allowed for containers created by the root user.
 
 **ns:**_namespace_: run the container in the given existing user namespace.
 
@@ -1473,14 +1478,12 @@ visible on host and vice versa. Making a volume **slave** enables only one
 way mount propagation and that is mounts done on host under that volume
 will be visible inside container but not the other way around. <sup>[[1]](#Footnote1)</sup>
 
-To control mount propagation property of volume one can use [**r**]**shared**,
-[**r**]**slave**, [**r**]**private** or [**r**]**unbindable** propagation flag.
-Propagation property can be specified only for bind mounted volumes and not for
-internal volumes or named volumes. For mount propagation to work source mount
-point (mount point where source dir is mounted on) has to have right propagation
-properties. For shared volumes, source mount point has to be shared. And for
-slave volumes, source mount has to be either shared or slave.
-<sup>[[1]](#Footnote1)</sup>
+To control mount propagation property of a volume one can use the [**r**]**shared**,
+[**r**]**slave**, [**r**]**private** or the [**r**]**unbindable** propagation flag.
+For mount propagation to work the source mount point (the mount point where source dir
+is mounted on) has to have the right propagation properties. For shared volumes, the
+source mount point has to be shared. And for slave volumes, the source mount point
+has to be either shared or slave. <sup>[[1]](#Footnote1)</sup>
 
 If you want to recursively mount a volume and all of its submounts into a
 container, then you can use the **rbind** option. By default the bind option is
@@ -1979,15 +1982,15 @@ in the following order of precedence (later entries override earlier entries):
 - **--env-file**: Any environment variables specified via env-files. If multiple files specified, then they override each other in order of entry.
 - **--env**: Any environment variables specified will override previous settings.
 
-Run containers and set the environment ending with a __*__ and a __*****__:
+Run containers and set the environment ending with a __*__.
+The trailing __*__ glob functionality is only active when no value is specified:
 
 ```
 $ export ENV1=a
-$ podman run --env ENV* alpine printenv ENV1
-a
-
-$ podman run --env ENV*****=b alpine printenv ENV*****
-b
+$ podman run --env 'ENV*' alpine env | grep ENV
+ENV1=a
+$ podman run --env 'ENV*=b' alpine env | grep ENV
+ENV*=b
 ```
 
 ## CONMON
